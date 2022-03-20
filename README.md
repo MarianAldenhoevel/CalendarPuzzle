@@ -1,7 +1,7 @@
 # CalendarPuzzle
 This has code to analyze and solve a calendar puzzle.
 
-![Puzzle](image.jpg | width=500)
+![Puzzle](image.jpg)
 
 This puzzle offers challenges for all 366 valid dates and each weekday for a total of 2562 individual challenges.
 
