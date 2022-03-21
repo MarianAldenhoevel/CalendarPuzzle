@@ -18,8 +18,41 @@ COVERAGEFILE = '.\\render\\coverage.xlsx'
 if os.path.isfile(COVERAGEFILE):
     os.remove(COVERAGEFILE)
 
+'''
+    A: XXXX
+
+    B:    X
+       XXXX
+        
+    C:   X
+       XXX
+
+    D: XXX
+        X
+        X
+
+    E: XX
+        X
+
+    F: XXXX
+       XXX
+
+    G: XXX
+         X
+         X
+
+    H: X X
+       XXX
+
+    I: XXX
+         XX
+
+    J:  XX
+         XX      
+'''
+
 partscatalog = {
-    'A': [(0, 0), (4, 0), (4, 1), (0, 1), (0, 0)],        
+    'A': [(0, 0), (4, 0), (4, 1), (0, 1), (0, 0)],       
     'B': [(0, 0), (4, 0), (4, 2), (3, 2), (3, 1), (0, 1), (0, 0)],    
     'C': [(0, 0), (3, 0), (3, 2), (2, 2), (2, 1), (0, 1), (0, 0)],
     'D': [(0, 0), (3, 0), (3, 1), (2, 1), (2, 3), (1, 3), (1, 1), (0, 1), (0, 0)],
@@ -89,6 +122,7 @@ def render(d, jsonfile, destbasename):
         ctx.close_path()
 
     def partpoly(ctx, points):
+        ctx.new_path()    
         ctx.move_to(cellx(points[0][0]), celly(points[0][1]))
         for point in points[1:]:
             ctx.line_to(cellx(point[0]), celly(point[1]))
@@ -173,17 +207,24 @@ def render(d, jsonfile, destbasename):
         
             ctx.save()
 
+            # Translate into position.
             ctx.translate(cellwidth * xoffset, -cellheight * yoffset)
-
-            partpoly(ctx, poly)
             
+            # Rotate around and mirror about the center:
+            # Create path so we can get the extents.
+            partpoly(ctx, poly)
+            # Translate to center.
             x1, y1, x2, y2 = ctx.fill_extents()
             xc = (x1 + x2) / 2
             yc = (y1 + y2) / 2
+
             ctx.translate(xc, yc)
+            # Rotate.
             ctx.rotate(-rotation * math.pi / 180)
+            # Mirror.
             if ismirrored:
                 ctx.scale(-1, 1)
+            # Translate back.
             ctx.translate(-xc, -yc)            
             
             ctx.new_path()
@@ -199,7 +240,7 @@ def render(d, jsonfile, destbasename):
             ctx.stroke()
 
             ctx.restore()
-
+        
             i += 1
     
     ctx.set_source_rgb(0, 0, 0)
@@ -276,8 +317,6 @@ configurationsmissing = []
 os.makedirs(f'render\\catalog', exist_ok = True)
 
 for year in range(2022,2049):
-    os.makedirs(f'render\\{year}', exist_ok = True)
-
     start = datetime.datetime(year, 1, 1)
     end = datetime.datetime(year, 12, 31)
 
@@ -312,6 +351,7 @@ for year in range(2022,2049):
                         print(f'  Error loading JSON from {jsonfile}')
                         raise
                     print(f'  {d:%d.%m.%Y}: Rendering ({weekdaylabels[d.weekday()]})' + ' '*50, end='\r')
+                    os.makedirs(f'render\\{year}', exist_ok = True)
                     render(d, jsondata, destbasename)
                     freshlyrendered += 1
             

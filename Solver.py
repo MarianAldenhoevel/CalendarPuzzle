@@ -194,6 +194,40 @@ class BoardState:
       raise ValueError('Total parts area does not match target area, puzzle is invalid.')
 
   # Create a list of all the parts that make up the puzzle.
+
+  '''
+    A: XXXX
+
+    B: XXXX
+          X
+        
+    C: XXX
+         X
+
+    D: XXX
+        X
+        X
+
+    E: XX
+        X
+
+    F: XXXX
+       XXX
+
+    G: XXX
+         X
+         X
+
+    H: X X
+       XXX
+
+    I: XXX
+         XX
+
+    J:  XX
+         XX      
+  '''
+
   partscatalog = [
     Part('A', Polygon([(0, 0), (4, 0), (4, 1), (0, 1), (0, 0)]), 'firebrick', False),        
     Part('B', Polygon([(0, 0), (4, 0), (4, 2), (3, 2), (3, 1), (0, 1), (0, 0)]), 'green', True),    
