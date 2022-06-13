@@ -21,6 +21,7 @@ import math
 import json
 import calendar
 import portalocker
+import platform
 
 from shapely.geometry.polygon import Polygon
 from shapely.geometry.point import Point
@@ -245,7 +246,7 @@ class BoardState:
   # are named with a framenumber, optionally followed by a caption denoting wether this
   # is a solution, a dead-end or an intermediate step. The remaining parameters can be
   # used to further specify which type of a frame is being generated.
-  def plot(self, caption = '', movingpart = None, candidatepositions = None, deadpart = None):
+  def plot(self, caption = ''):
     
     global options
 
@@ -278,45 +279,6 @@ class BoardState:
       patch = PolygonPatch(polygon, facecolor=part.color)
       ax.add_patch(patch)
   
-    # Plot the available parts in a grid off to the side.
-    if self.parts_available:
-      bounds = self.remaining_target.bounds
-      xoffset = bounds[0] # minx
-      yoffset = bounds[1]-4 # miny and down from there
-      for part in self.parts_available:
-        polygon = translate(part.polygon, xoffset, yoffset)
-        BoardState.extents = BoardState.extents.union(polygon)
-        patch = PolygonPatch(polygon, facecolor=part.color)
-        ax.add_patch(patch)
-
-        # Is this the dead part? If so draw a red edge around it in its
-        # resting position.
-        if deadpart and (deadpart.name == part.name):
-          patch = PolygonPatch(polygon, facecolor=part.color, edgecolor='red')
-          ax.add_patch(patch)
-
-        # Next cell in the grid
-        xoffset = xoffset + 5
-        if xoffset > 12:
-          xoffset = 0
-          yoffset = yoffset - 4
-
-    # Plot the part that is currently on the move slightly ghosted.
-    if movingpart:
-      polygon = movingpart.finalpolygon()
-      BoardState.extents = BoardState.extents.union(polygon)
-      patch = PolygonPatch(polygon, facecolor=movingpart.color, alpha=0.5)
-      ax.add_patch(patch)
-
-    # Plot candidatepositions. These are drawn with a smaller alpha so we
-    # can see them overlap.
-    if candidatepositions:
-      for part in candidatepositions:
-        polygon = part.finalpolygon()
-        BoardState.extents = BoardState.extents.union(polygon)
-        patch = PolygonPatch(polygon, facecolor=part.color, alpha=0.2)
-        ax.add_patch(patch)
-
     # Update the overall bounds carried over from frame to frame. We want them
     # to nicely align for montage.
     bounds = BoardState.extents.bounds
@@ -339,7 +301,7 @@ class BoardState:
     pyplot.close(fig)
     
     # Save solution as json so we have the option of plotting it in a different way.
-    jsonboard = []
+    jsonparts = []
     for part in self.parts_placed:
       jsonpart = {
         'name': part.name,
@@ -348,11 +310,22 @@ class BoardState:
         'rotation': part.rotation,
         'ismirrored': part.ismirrored
       }
-      jsonboard.append(jsonpart)
+      jsonparts.append(jsonpart)
+
+    jsondata = {
+        'configuration': {
+            'month': self.calendarconfiguration.month,
+            'monthlabel': monthlabels[self.calendarconfiguration.month-1],
+            'day': self.calendarconfiguration.day,
+            'weekday': self.calendarconfiguration.weekday,
+            'weekdaylabel': weekdaylabels[self.calendarconfiguration.weekday]
+        },
+        'parts': jsonparts
+    }
 
     jsonname = os.path.splitext(figname)[0] + '.json'
     with open(jsonname, 'w') as f:
-      json.dump(jsonboard, f, sort_keys=True, indent=4)
+      json.dump(jsondata, f, sort_keys=True, indent=4)
 
     BoardState.framenr += 1
 
@@ -463,10 +436,7 @@ def solve(board):
         indent=indent,
         min_target_area=min_target.area,
         finalpositions=finalpositions))
-      
-      if options.plotdeadends:
-        board.plot('deadend_area', None, None, min_part)
-
+          
     elif not mayfit(min_target, min_part):
       finalpositions += 1
       logger.debug('<{level:02d}> {indent}Dead end: Minimum disjoint space {min_target_area} same size as minimum piece but does not fit. Checked {finalpositions} final positions.'.format(
@@ -475,9 +445,6 @@ def solve(board):
         min_target_area=min_target.area,
         finalpositions=finalpositions))
       
-      if options.plotdeadends:
-        board.plot('deadend_nofit', None, None, min_part)  
-
     else:
       # Not a dead-end after the check for minimum disjoint area.
 
@@ -559,9 +526,7 @@ def solve(board):
             indent=indent,
             name=nextpart.name,
             finalpositions=finalpositions))
-          
-        if options.plotdeadends:
-          board.plot('deadend_nopos',None, None, nextpart)
+
       else:    
         # For each candidate position prepare a list of next boards by copying 
         # the current one. Remove the part we just (tentatively) placed from the list
@@ -600,9 +565,7 @@ def solve(board):
         # Update candidatepositions to include any filtering that has happened.
         nextpart.candidatepositions = list(map(lambda board: board.candidateposition, nextboards))
 
-        # If requested plot a frame with all remaining candidate positions displayed.    
-        if options.plotcandidates:
-          board.plot('candidatepositions', None, nextpart.candidatepositions)
+        random.shuffle(nextpart.candidatepositions)
 
         # Now recurse down into each candidate board to find solutions.
         i = 1
@@ -616,9 +579,6 @@ def solve(board):
               nextboards=len(nextboards),
               name=nextpart.name
             ))
-
-          if options.plotstepbystep:
-            nextboard.plot('try{i:02d}'.format(i=i), nextboard.candidateposition)
 
           solve(nextboard)
 
@@ -659,7 +619,7 @@ def solvefor(month, day, weekday):
 
   # Plot the initial board state, this is the starting frame and shows all the parts
   # next to the empty target.
-  board.plot('setup')
+  # board.plot('setup')
 
   # Try to solve it
 
@@ -706,42 +666,6 @@ def parse_commandline():
     metavar = 'flag'
   )
 
-  parser.add_argument('-pc', '--plot-candidates',
-    action = 'store',
-    default = False,
-    type = str2bool,
-    help = 'Output a frame showing all generated candidate positions shaded (default: %(default)s)',
-    dest = 'plotcandidates',
-    metavar = 'flag'
-  )
-
-  parser.add_argument('-pd', '--plot-deadends',
-    action = 'store',
-    default = False,
-    type = str2bool,
-    help = 'Output a frame showing each dead-end position (default: %(default)s)',
-    dest = 'plotdeadends',
-    metavar = 'flag'
-  )
-
-  parser.add_argument('-ps', '--plot-solutions',
-    action = 'store',
-    default = True,
-    type = str2bool,
-    help = 'Output a frame showing each solution (default: %(default)s)',
-     dest = 'plotsolutions',
-    metavar = 'flag'
-  )
-
-  parser.add_argument('-pb', '--plot-step-by-step',
-    action = 'store',
-    default = False,
-    type = str2bool,
-    help = 'Output a frame showing each candidate position as it is tried (default: %(default)s)',
-    dest = 'plotstepbystep',
-    metavar = 'flag'
-  )
-
   parser.add_argument('-df', '--decorate-frames',
     action = 'store',
     default = True,
@@ -773,6 +697,15 @@ def parse_commandline():
     type = str2bool,
     help = 'Play a fanfare whenever a solution is found (default: %(default)s)',
     dest = 'playfanfare',
+    metavar = 'flag'
+  )
+
+  parser.add_argument('-ps', '--plot-solutions',
+    action = 'store',
+    default = True,
+    type = str2bool,
+    help = 'Plot each solution (default: %(default)s)',
+    dest = 'plotsolutions',
     metavar = 'flag'
   )
 
@@ -830,21 +763,28 @@ def main():
 
   # I have determined that the years 2022 to 2044 (inclusive) use all possible
   # configurations of month, day and weekday. Solve for each of them:
-  for year in range(2023, 2045):
-    # Start on the weekday that year starts on. This way we will build the configurations
-    # in calendar-order. We will try configurations multiple times, but we can detect that 
-    # before actually attempting to solve.
-    weekday = datetime.datetime(year, 1, 1).weekday() # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+  for year in range(2022, 2045):    
+    # Just regular:
+    months = range(1,13)
+    days = range(1,32)
+
+    # Starting on a certain date:
+    startmonth = 7
+    startday = 1
+    months = list(range(startmonth,13)) + list(range(1,startmonth))
+    days = list(range(startday,32)) + list(range(1,startday))
     
-    for month in range(1,13):
-      for day in range(1,32):
+    for month in months:
+      for day in days:
 
         # Skip invalid dates:
         if (month == 2) and (day > (29 if calendar.isleap(year) else 28)):
           continue
         elif (month in [4,6,9,11]) and (day > 30):
           continue
-        
+
+        weekday = datetime.datetime(year, month, day).weekday() # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
+            
         # Attempt to clean up stale lock files
         lockfiles = glob.glob(options.runfolder + '\\..\\catalog\\*.lck')
         for lockfile in lockfiles:
@@ -867,6 +807,10 @@ def main():
               lockfile.flush()
               os.fsync(lockfile.fileno())
 
+              # In Windows rename the shell title.
+              if platform.system() == 'Windows':
+                os.system(f'cmd.exe /C title {year:04d}-{month:02d}-{day:02d}')
+                              
               logger.info(f'Now solving for {catalogname}')        
               os.makedirs(options.runfolder, exist_ok = True)                            
               solvefor(month, day, weekday)
@@ -879,9 +823,7 @@ def main():
               os.remove(lockfilename)
             except:
               pass
-
-        weekday = (weekday + 1) % 7
-        
+    
   endtime = datetime.datetime.now().replace(microsecond=0)
   runtime = (endtime-starttime)
   logger.info('Finished. Total runtime: {runtime}'.format(runtime=runtime))
