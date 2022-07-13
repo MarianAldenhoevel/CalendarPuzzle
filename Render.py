@@ -1,12 +1,13 @@
+import sys
 import datetime
 import calendar
 import os 
-import glob
-import shutil
 import json
 import cairo
 import math
 import xlsxwriter
+import collections
+import random
 
 # Create a calendar for each year in the range from the solutions discovered
 # by the Solver. For each day find the solution-JSON in the catalog, load it
@@ -14,7 +15,19 @@ import xlsxwriter
 #
 # Also write a XLSX file with general statistics.
 
-COVERAGEFILE = '.\\render\\coverage.xlsx'
+basename = ''
+if len(sys.argv)>1:
+    basename = sys.argv[1]
+if not basename:
+    basename = '..\\catalog'
+
+#basename = 'do'
+#basename = 'xrcloud'
+#basename = 'complete'
+
+print(f'Basename={basename}')
+
+COVERAGEFILE = f'.\\render\\{basename}\\coverage.xlsx'
 if os.path.isfile(COVERAGEFILE):
     os.remove(COVERAGEFILE)
 
@@ -31,8 +44,9 @@ if os.path.isfile(COVERAGEFILE):
         X
         X
 
-    E: XX
-        X
+    E: X
+       XXX
+         X 
 
     F: XXXX
        XXX
@@ -64,7 +78,7 @@ partscatalog = {
     'J': [(0, 0), (2, 0), (2, 1), (3, 1), (3, 2), (1, 2), (1, 1), (0, 1), (0, 0)]
 }
 
-def render(d, jsonfile, destbasename):
+def render(d, jsondata, destbasename, style):
 
     def arctopleft(ctx, cornerx, cornery, radius):
         ctx.arc(cornerx + radius, cornery + radius, radius, math.pi, 3*math.pi/2)
@@ -128,7 +142,7 @@ def render(d, jsonfile, destbasename):
             ctx.line_to(cellx(point[0]), celly(point[1]))
         ctx.close_path()
         
-    cellwidth = 100
+    cellwidth = 50
     cellheight = cellwidth
     margin = 2
     boardmargin = cellwidth // 2
@@ -145,17 +159,17 @@ def render(d, jsonfile, destbasename):
     ctx = cairo.Context(ims)
     
     ctx.select_font_face('Courier', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
-    ctx.set_font_size(40)
+    ctx.set_font_size(20)
     ctx.set_fill_rule(cairo.FILL_RULE_EVEN_ODD)    
-    ctx.set_line_width(2)
+    ctx.set_line_width(1)
 
     # Draw outer border
     radius = boardmargin // 3 * 2
     outer(ctx)
 
     ctx.set_source_rgb(1, 1, 1)
-    if tex_low:
-        ctx.set_source(tex_low)    
+    if style['texture_low']:
+        ctx.set_source(style['texture_low'])    
     ctx.fill_preserve()
 
     ctx.set_source_rgb(0, 0, 0)
@@ -194,13 +208,110 @@ def render(d, jsonfile, destbasename):
 
     # Draw parts
     i = 0
-    for part in jsondata:
+    for part in jsondata['parts']:
         
         name = part['name']
         xoffset = part['xoffset']
         yoffset = part['yoffset']
         rotation = part['rotation']
         ismirrored = part['ismirrored']
+
+        #if name != 'F':
+        #    continue
+
+        # Now. This is terrible. When I build a new solver I modelled the orientation of parts
+        # differently completely screwing up the renderer. Instead of fixing it properly I
+        # fudged the values here so that everything lines up again. This is just a unit-conversion
+        # done in the worst possible way. 
+        # Look in the JSON solution for the proper layout if something is broken.
+
+        v3 = True
+        if v3:
+
+            if (name != 'B') and (name != 'C') and (name != 'F'):
+                if rotation == 90:
+                    rotation = 270
+                elif rotation == 270:
+                    rotation = 90
+
+            while rotation < 0:
+                rotation +=360
+            while rotation > 360:
+                rotation -=360
+                
+            yoffset -= 1
+            if name == 'A':
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 1.5
+                    yoffset += 1.5  
+            elif name == 'B':
+                ismirrored = not ismirrored
+                
+                if not ismirrored:
+                    if rotation == 180:
+                        rotation = 0
+                    elif rotation == 0:
+                        rotation = 180
+
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 1
+                    yoffset += 1
+            elif name == 'C':                
+                ismirrored = not ismirrored
+                
+                if not ismirrored:
+                    if rotation == 180:
+                        rotation = 0
+                    elif rotation == 0:
+                        rotation = 180
+
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 0.5
+                    yoffset += 0.5   
+            elif name == 'D':
+                pass                
+            elif name == 'E':
+                pass
+            elif name == 'F':
+                pass
+                
+                if ismirrored:
+                    if rotation == 0:
+                        rotation = 180
+                    elif rotation == 180:
+                        rotation = 0
+
+                if True: #not ismirrored:
+                    if rotation == 90:
+                        rotation = 270
+                    elif rotation == 270:
+                        rotation = 90
+
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 0.5
+                    yoffset += 0.5
+            elif name == 'G':
+                pass
+                #rotation -= 180
+            elif name == 'H':
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 0.5
+                    yoffset += 0.5
+            elif name == 'I':
+
+                if ismirrored:
+                    if rotation == 180:
+                        rotation = 0
+                    elif rotation == 0:
+                        rotation = 180
+
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 1
+                    yoffset += 1                
+            elif name == 'J':
+                if rotation == 90 or rotation == 270:
+                    xoffset -= 0.5
+                    yoffset += 0.5 
 
         if name in partscatalog:
             poly = partscatalog[name]
@@ -219,10 +330,13 @@ def render(d, jsonfile, destbasename):
             yc = (y1 + y2) / 2
 
             ctx.translate(xc, yc)
+            # Mirror (v3 before rotation and on y-axis)
+            if v3 and ismirrored:
+                ctx.scale(-1, 1)
             # Rotate.
             ctx.rotate(-rotation * math.pi / 180)
-            # Mirror.
-            if ismirrored:
+            # Mirror (non-v3 after rotation and on x-axis).
+            if not v3 and ismirrored:
                 ctx.scale(-1, 1)
             # Translate back.
             ctx.translate(-xc, -yc)            
@@ -230,10 +344,11 @@ def render(d, jsonfile, destbasename):
             ctx.new_path()
             partpoly(ctx, poly)
             
-            pcol = partcol[i % len(partcol)]
-            ctx.set_source_rgba(pcol[0], pcol[1], pcol[2], pcol[3])
-            if tex_part:
-                ctx.set_source(tex_part)
+            if style['color_parts']:
+                pcol = style['color_parts'][i % len(style['color_parts'])]
+                ctx.set_source_rgba(pcol[0], pcol[1], pcol[2], pcol[3])
+            if style['texture_parts']:
+                ctx.set_source(style['texture_parts'])
             ctx.fill_preserve()
 
             ctx.set_source_rgb(0, 0, 0)
@@ -267,14 +382,19 @@ def render(d, jsonfile, destbasename):
     ctx.rectangle(yearlabel_x, yearlabel_y, yearlabel_width, yearlabel_height)
 
     ctx.set_source_rgb(1, 1, 1)
-    if tex:
-        ctx.set_source(tex)
+    if style['texture_high']:
+        ctx.set_source(style['texture_high'])
     ctx.fill_preserve()
 
     ctx.set_source_rgb(0, 0, 0)
     ctx.stroke()
 
     ims.write_to_png(destbasename + '.png')
+
+    # Convert to a jpg using imagemagick and delete the png. This is for size.
+    cmdline = f'magick.exe convert {destbasename}.png -quality 85% {destbasename}.jpg'
+    os.system(cmdline)
+    os.remove(destbasename + '.png')
 
 def counter(i):
     if i<=1:
@@ -284,25 +404,6 @@ def counter(i):
 
 monthlabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 weekdaylabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-
-teximage = cairo.ImageSurface.create_from_png('texture.png')
-tex = cairo.SurfacePattern(teximage)
-tex.set_extend(cairo.EXTEND_REFLECT)
-
-teximage = cairo.ImageSurface.create_from_png('texture_low.png')
-tex_low = cairo.SurfacePattern(teximage)
-tex_low.set_extend(cairo.EXTEND_REFLECT)
-
-# Texture parts. Leave as None for no texture
-#tex_part = None
-tex_part = tex
-
-# Color for the parts as RGBA-tuple. Only used if tex_part is None
-partcol = [
-    (0, 0, 1, 0.4),
-    (0, 0, 1, 0.5),
-    (0, 0, 1, 0.6)
-]
 
 found = 0
 notfound = 0
@@ -314,7 +415,48 @@ datesrendered = []
 configurationsfound = []
 configurationsmissing = []
 
-os.makedirs(f'render\\catalog', exist_ok = True)
+teximage = cairo.ImageSurface.create_from_png('texture.png')
+texture = cairo.SurfacePattern(teximage)
+texture.set_extend(cairo.EXTEND_REFLECT)
+
+teximage = cairo.ImageSurface.create_from_png('texture_low.png')
+texture_low = cairo.SurfacePattern(teximage)
+texture_low.set_extend(cairo.EXTEND_REFLECT)
+
+styles = []
+
+styles.append({
+    'texture_high':  texture,
+    'texture_low':   texture_low,
+    'texture_parts': texture,
+    'color_parts':   None
+})
+
+styles.append({
+    'texture_high':  texture,
+    'texture_low':   texture_low,
+    'texture_parts': None,
+    'color_parts':
+        # Color for the parts as RGBA-tuple. Only used if tex_part is None
+        [
+            (0, 0, 1, 0.4),
+            (0, 0, 1, 0.5),
+            (0, 0, 1, 0.6)
+        ]
+})
+
+styles.append({
+    'texture_high':  texture,
+    'texture_low':   texture_low,
+    'texture_parts': None,
+    'color_parts':
+        # Color for the parts as RGBA-tuple. Only used if tex_part is None
+        [
+            (0, 143/255, 0, 0.4),
+            (0, 143/255, 0, 0.5),
+            (0, 143/255, 0, 0.6)
+        ]
+})
 
 for year in range(2022,2049):
     start = datetime.datetime(year, 1, 1)
@@ -322,8 +464,8 @@ for year in range(2022,2049):
 
     d = start
     while (d<=end):
-        catalogbasename = f'.\\render\\catalog\\{d.month:02d}{d.day:02d}{d.weekday():02d}-{monthlabels[d.month-1]}-{d.day:02d}-{weekdaylabels[d.weekday()]}'
-        destbasename = f'.\\render\\{d.year}\\{d.year}-{d.month:02d}-{d.day:02d}'
+        catalogbasename = f'.\\render\\{basename}\\{d.month:02d}{d.day:02d}{d.weekday():02d}-{monthlabels[d.month-1]}-{d.day:02d}-{weekdaylabels[d.weekday()]}'
+        destbasename = f'.\\render\\{basename}\\{d.year}\\{d.month:02d}\\{d.year}-{d.month:02d}-{d.day:02d}'
 
         configuration = f'{d.month}-{d.day}-{d.weekday()}'
             
@@ -334,7 +476,7 @@ for year in range(2022,2049):
             if configuration not in configurationsfound:
                 configurationsfound.append(configuration)
 
-            if os.path.isfile(destbasename + '.png'):
+            if os.path.isfile(destbasename + '.jpg'):
                 consmissing = 0
                 if consrendered == 0:
                     print('')
@@ -350,9 +492,36 @@ for year in range(2022,2049):
                     except:
                         print(f'  Error loading JSON from {jsonfile}')
                         raise
+
+                    # We forgot to put the information on configuration in when saving the file and 
+                    # it is only encoded in the filename. If we encounter such a file we parse the
+                    # filename and add the information in on the fly.                    
+                    if isinstance(jsondata, collections.abc.Sequence):
+                        # jsondata is still "just" an array. Turn into an object, add the
+                        # missing information from the filename, then save back.
+                        bn = os.path.basename(jsonfile)
+                        month = int(bn[0:2])
+                        day = int(bn[2:4])
+                        weekday = int(bn[4:6])
+
+                        jsondata = {
+                            'configuration': {
+                                'month': month,
+                                'monthlabel': monthlabels[month-1],
+                                'day': day,
+                                'weekday': weekday,
+                                'weekdaylabel': weekdaylabels[weekday]
+                            },
+                            'parts': jsondata
+                        }
+
+                        with open(jsonfile, 'w') as f:
+                            json.dump(jsondata, f, sort_keys=False, indent=4)
+                       
                     print(f'  {d:%d.%m.%Y}: Rendering ({weekdaylabels[d.weekday()]})' + ' '*50, end='\r')
-                    os.makedirs(f'render\\{year}', exist_ok = True)
-                    render(d, jsondata, destbasename)
+                    os.makedirs(f'render\\{basename}\\{d.year}\\{d.month:02d}', exist_ok = True)
+                    
+                    render(d, jsondata, destbasename, random.choice(styles))
                     freshlyrendered += 1
             
             datesrendered.append(d)                    

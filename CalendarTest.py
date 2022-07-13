@@ -1,5 +1,12 @@
 import datetime
 
+for y in range(2022,2024):
+    d = datetime.datetime(y,2,28)
+    if d.weekday()==1:
+        print(d)
+quit()
+
+
 challenges = []
 repeating = False
 stretch = 0

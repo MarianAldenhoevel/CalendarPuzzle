@@ -1,1 +1,0 @@
-wt.exe nt --title #1 python.exe .\Solver.py ; nt --title #2 python.exe .\Solver.py ; nt --title #3 python.exe .\Solver.py ; nt --title #4 python.exe .\Solver.py ; nt --title Render python.exe .\Render.py

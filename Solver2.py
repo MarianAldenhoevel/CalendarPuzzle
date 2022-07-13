@@ -201,8 +201,9 @@ class BoardState:
         X
         X
 
-    E: XX
-        X
+    E: X
+       XXX
+         X
 
     F: XXXX
        XXX

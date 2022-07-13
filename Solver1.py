@@ -14,7 +14,7 @@ import glob
 import sys
 import time
 import copy
-import simpleaudio
+#import simpleaudio
 import datetime
 import argparse 
 import math
@@ -209,8 +209,9 @@ class BoardState:
         X
         X
 
-    E: XX
-        X
+    E: X
+       XXX
+         X
 
     F: XXXX
        XXX
@@ -295,7 +296,7 @@ class BoardState:
       basename += '.' + caption
     basename += '.png'
     
-    figname = options.runfolder + '\\' + basename 
+    figname = options.runfolder + '/' + basename 
     fig.savefig(figname)
 
     pyplot.close(fig)
@@ -395,56 +396,76 @@ def solve(board):
 
     solutions += 1
 
-    if options.playfanfare:
-      wavfilename = os.path.dirname(os.path.realpath(__file__)) + '\\fanfare.wav'
-      if os.path.isfile(wavfilename):
-        wav = simpleaudio.WaveObject.from_wave_file(wavfilename)
-        wav.play()
+    #if options.playfanfare:
+    #  wavfilename = os.path.dirname(os.path.realpath(__file__)) + '/fanfare.wav'
+    #  if os.path.isfile(wavfilename):
+    #    wav = simpleaudio.WaveObject.from_wave_file(wavfilename)
+    #    wav.play()
 
     if options.plotsolutions:
       figname = board.plot('solution')
       figname = os.path.splitext(figname)[0]
-      filenames = glob.glob(options.runfolder + '\\' + figname + '.*')
+      filenames = glob.glob(options.runfolder + '/' + figname + '.*')
       
       # Copy all solution files out under a name for convenient lookup.
       catalogname = f'{board.calendarconfiguration.month:02d}{board.calendarconfiguration.day:02d}{board.calendarconfiguration.weekday:02d}-{monthlabels[board.calendarconfiguration.month-1]}-{board.calendarconfiguration.day:02d}-{weekdaylabels[board.calendarconfiguration.weekday]}'
       for filename in filenames:
-        destname = options.runfolder + '\\..\\catalog\\' + catalogname + os.path.splitext(filename)[1]
+        destname = options.runfolder + '/../catalog/' + catalogname + os.path.splitext(filename)[1]
         shutil.copyfile(filename, destname)
       
   else:
     # There are parts left to place, we need to recurse further down.
-    #
+    
+    # Optimization: Look at each disjoint part of the remaining target.
+    # If the area of one of those is 1, 2 or 3 squares we can never cover 
+    # them with parts.
+    deadend = False
+    if board.remaining_target.geom_type == 'MultiPolygon':
+      for p in board.remaining_target.geoms:
+        if p.area <= 3:
+          deadend = True
+          break
+    else:
+      if board.remaining_target.area <= 3:
+         deadend = True
+
+    if deadend:
+      finalpositions += 1
+      logger.debug('<{level:02d}> {indent}Dead end: Disjoint space too small for minimum piece. Checked {finalpositions} final positions.'.format(
+        level=len(board.parts_placed),
+        indent=indent,
+        finalpositions=finalpositions))
+      
     # Optimization: Check wether the smallest remaining disjoint area is still
     # applicable for the smallest part. If not we are already done with this whole
     # tree.
-    min_target = board.remaining_target
-    if board.remaining_target.geom_type == 'MultiPolygon':
-      for p in board.remaining_target.geoms:
-        if (p.area < min_target.area):
-          min_target = p
-    else:
-      min_target = board.remaining_target 
-    
+    #min_target = board.remaining_target
+    #if board.remaining_target.geom_type == 'MultiPolygon':
+    #  for p in board.remaining_target.geoms:
+    #    if (p.area < min_target.area):
+    #      min_target = p
+    #else:
+    #  min_target = board.remaining_target 
+    # 
     # parts_available is sorted by size
-    min_part = board.parts_available[len(board.parts_available)-1]
-
-    if min_target.area < min_part.polygon.area:
-      finalpositions += 1
-      logger.debug('<{level:02d}> {indent}Dead end: Minimum disjoint space {min_target_area} too small for minimum piece. Checked {finalpositions} final positions.'.format(
-        level=len(board.parts_placed),
-        indent=indent,
-        min_target_area=min_target.area,
-        finalpositions=finalpositions))
-          
-    elif not mayfit(min_target, min_part):
-      finalpositions += 1
-      logger.debug('<{level:02d}> {indent}Dead end: Minimum disjoint space {min_target_area} same size as minimum piece but does not fit. Checked {finalpositions} final positions.'.format(
-        level=len(board.parts_placed),
-        indent=indent,
-        min_target_area=min_target.area,
-        finalpositions=finalpositions))
-      
+    #min_part = board.parts_available[len(board.parts_available)-1]
+    #
+    #if min_target.area < min_part.polygon.area:
+    #  finalpositions += 1
+    #  logger.debug('<{level:02d}> {indent}Dead end: Minimum disjoint space {min_target_area} too small for minimum piece. Checked {finalpositions} final positions.'.format(
+    #    level=len(board.parts_placed),
+    #    indent=indent,
+    #    min_target_area=min_target.area,
+    #    finalpositions=finalpositions))
+    #      
+    #elif not mayfit(min_target, min_part):
+    #  finalpositions += 1
+    #  logger.debug('<{level:02d}> {indent}Dead end: Minimum disjoint space {min_target_area} same size as minimum piece but does not fit. Checked {finalpositions} final positions.'.format(
+    #    level=len(board.parts_placed),
+    #    indent=indent,
+    #    min_target_area=min_target.area,
+    #    finalpositions=finalpositions))
+    #  
     else:
       # Not a dead-end after the check for minimum disjoint area.
 
@@ -713,7 +734,7 @@ def parse_commandline():
   options.log_level_int = getattr(logging, options.log_level, logging.INFO)
 
   if not options.runfolder:
-    options.runfolder = os.path.dirname(os.path.realpath(__file__)) + '\\' + time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())
+    options.runfolder = os.path.dirname(os.path.realpath(__file__)) + '/' + time.strftime('%Y-%m-%d-%H-%M-%S', time.localtime())
 
 # Set up a logger each for a file in the output folder and the console.      
 def setup_logging():
@@ -722,7 +743,7 @@ def setup_logging():
   
   os.makedirs(options.runfolder, exist_ok = True)
 
-  fh = logging.FileHandler(options.runfolder + '\\Solver.log')
+  fh = logging.FileHandler(options.runfolder + '/Solver.log')
   fh.setLevel(options.log_level_int)
 
   ch = logging.StreamHandler()
@@ -761,15 +782,15 @@ def main():
   #solvefordate(date)
   #quit()
 
-  # I have determined that the years 2022 to 2044 (inclusive) use all possible
+  # I have determined that the years 2022 to 2048 (inclusive) use all possible
   # configurations of month, day and weekday. Solve for each of them:
-  for year in range(2022, 2045):    
+  for year in range(2022, 2049):    
     # Just regular:
     months = range(1,13)
     days = range(1,32)
 
     # Starting on a certain date:
-    startmonth = 7
+    startmonth = 1
     startday = 1
     months = list(range(startmonth,13)) + list(range(1,startmonth))
     days = list(range(startday,32)) + list(range(1,startday))
@@ -786,7 +807,7 @@ def main():
         weekday = datetime.datetime(year, month, day).weekday() # 0=Mon, 1=Tue, 2=Wed, 3=Thu, 4=Fri, 5=Sat, 6=Sun
             
         # Attempt to clean up stale lock files
-        lockfiles = glob.glob(options.runfolder + '\\..\\catalog\\*.lck')
+        lockfiles = glob.glob(options.runfolder + '/../catalog/*.lck')
         for lockfile in lockfiles:
             try:
               os.remove(lockfile)
@@ -796,11 +817,11 @@ def main():
         catalogname = f'{month:02d}{day:02d}{weekday:02d}-{monthlabels[month-1]}-{day:02d}-{weekdaylabels[weekday]}'
       
         # Already solved?
-        if glob.glob(options.runfolder + '\\..\\catalog\\' + catalogname + '.json'): # and glob.glob(options.runfolder + '\\..\\catalog\\' + catalogname + '.png'):
+        if glob.glob(options.runfolder + '/../catalog/' + catalogname + '.json'): # and glob.glob(options.runfolder + '/../catalog/' + catalogname + '.png'):
           logger.info(f'Already done {catalogname}')
         else:
           # No solution exists yet. Create a lock file so other processes know we are working on this.
-          lockfilename = options.runfolder + '\\..\\catalog\\' + catalogname + '.lck'
+          lockfilename = options.runfolder + '/../catalog/' + catalogname + '.lck'
           try:
             with portalocker.Lock(lockfilename, 'wt', timeout = 1) as lockfile:              
               lockfile.write(f'PID {os.getpid()}, started {datetime.datetime.now()}')
