@@ -1,0 +1,91 @@
+{
+    "board": [
+        "BBIIIx ",
+        "BCCCII ",
+        "BCJGGGA",
+        "BJJEEGA",
+        "DJHHEGA",
+        "DDDHEEA",
+        "DxHHxFF",
+        "    FFF"
+    ],
+    "configuration": {
+        "day": 30,
+        "month": 6,
+        "monthlabel": "Jun",
+        "weekday": 0,
+        "weekdaylabel": "Mon"
+    },
+    "parts": [
+        {
+            "ismirrored": true,
+            "name": "E",
+            "rotation": 0,
+            "xoffset": 3,
+            "yoffset": 2
+        },
+        {
+            "ismirrored": false,
+            "name": "D",
+            "rotation": 90,
+            "xoffset": 0,
+            "yoffset": 1
+        },
+        {
+            "ismirrored": false,
+            "name": "G",
+            "rotation": 270,
+            "xoffset": 3,
+            "yoffset": 3
+        },
+        {
+            "ismirrored": false,
+            "name": "A",
+            "rotation": 90,
+            "xoffset": 6,
+            "yoffset": 2
+        },
+        {
+            "ismirrored": false,
+            "name": "H",
+            "rotation": 270,
+            "xoffset": 2,
+            "yoffset": 1
+        },
+        {
+            "ismirrored": true,
+            "name": "J",
+            "rotation": 90,
+            "xoffset": 1,
+            "yoffset": 3
+        },
+        {
+            "ismirrored": true,
+            "name": "C",
+            "rotation": 0,
+            "xoffset": 1,
+            "yoffset": 5
+        },
+        {
+            "ismirrored": true,
+            "name": "I",
+            "rotation": 0,
+            "xoffset": 2,
+            "yoffset": 6
+        },
+        {
+            "ismirrored": false,
+            "name": "B",
+            "rotation": 90,
+            "xoffset": 0,
+            "yoffset": 4
+        },
+        {
+            "ismirrored": false,
+            "name": "F",
+            "rotation": 180,
+            "xoffset": 4,
+            "yoffset": 0
+        }
+    ]
+}
