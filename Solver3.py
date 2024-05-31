@@ -743,12 +743,13 @@ def main():
   logger.info('Random seed in use: {0}.'.format(options.seed))
   random.seed(options.seed)
 
-  #solvefor(2, 29, 4)
-  #quit()
+  # solvefor(2, 29, 4)
+  # quit()
 
-  #date = datetime.date(2022, 7, 6)
-  #solvefordate(date)
-  #quit()
+  date = datetime.date(2023, 9, 11)
+  # date = datetime.date.today()
+  solvefordate(date)
+  quit()
 
   # I have determined that the years 2022 to 2048 (inclusive) use all possible
   # configurations of month, day and weekday. Solve for each of them:
